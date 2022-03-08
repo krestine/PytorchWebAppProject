@@ -1,8 +1,9 @@
 from flask import Flask, request
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
-import os
+# import os
 import json
+# import base64
 
 # import torch
 import numpy as np
@@ -36,6 +37,8 @@ UPLOAD_FOLDER = 'data/uploads/'
 ALLOWED_EXTENSIONS = set(['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'])
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+label_dict = {0: '사과', 1: '산', 2: '달', 3: '얼굴', 4: '문',
+              5: '봉투', 6: '물고기', 7: '기타', 8: '별', 9: '번개'}
 
 @app.route("/")
 def hello():
@@ -55,6 +58,7 @@ def upload_file():
 
         # check if the post request has the file part
         if 'file' not in request.files:
+            # print("no file part")
             return "No file part"
         file = request.files['file']
 
@@ -76,17 +80,20 @@ def upload_file():
 def preprocess(input_data):
     # convert the input data into the float32 input
     img_data = input_data.astype('float32')
+    norm_img_data = img_data.reshape(1, 784).astype('float32')
+    return norm_img_data
 
     # normalize
-    mean_vec = np.array([0.485, 0.456, 0.406])
+    ''' mean_vec = np.array([0.485, 0.456, 0.406])
     stddev_vec = np.array([0.229, 0.224, 0.225])
     norm_img_data = np.zeros(img_data.shape).astype('float32')
     for i in range(img_data.shape[0]):
         norm_img_data[i, :, :] = (img_data[i, :, :] / 255 - mean_vec[i]) / stddev_vec[i]
 
     # add batch channel
-    norm_img_data = norm_img_data.reshape(1, 3, 224, 224).astype('float32')
-    return norm_img_data
+    # norm_img_data = norm_img_data.reshape(1, 1, 28, 28).astype('float32')
+    norm_img_data = norm_img_data.reshape(1, 784).astype('float32')
+    return norm_img_data'''
 
 
 def predict_img(read_img):
@@ -100,7 +107,9 @@ def predict_img(read_img):
     # architecture = onnx.load("squeezenet1.1-7.onnx")
     # onnx.checker.check_model(architecture)
 
-    ort_session = onnxruntime.InferenceSession("squeezenet1.1-7.onnx")
+    # ort_session = onnxruntime.InferenceSession("squeezenet1.1-7.onnx")
+    ort_session = onnxruntime.InferenceSession("test_onnx.onnx")
+    # ort_session = onnxruntime.InferenceSession("mobilenetv2-7.onnx")
 
     #def to_numpy(tensor):
         #return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
@@ -120,7 +129,9 @@ def predict_img(read_img):
         transforms.ToTensor(),
         normalize
     ])'''
-    read_img = read_img.resize((224, 224))
+    # read_img = read_img.resize((224, 224))
+    read_img = read_img.resize((28, 28))
+    read_img = read_img.convert('L')
 
     # Path to uploaded image
     # path_img = img_path
@@ -132,7 +143,8 @@ def predict_img(read_img):
     # if path_img.endswith('.png'):
         # read_img = read_img.convert('RGB')
 
-    image_data = np.array(read_img).transpose(2, 0, 1)
+    # image_data = np.array(read_img).transpose(2, 0, 1)
+    image_data = np.array(read_img)
     img_tensor = preprocess(image_data)
     # img_tensor.unsqueeze_(0)
     # img_variable = Variable(img_tensor)
@@ -153,7 +165,9 @@ def predict_img(read_img):
     # print("\n Answer: ", labels[outputs.data.numpy().argmax()])
 
     # return labels[outputs.data.numpy().argmax()]
-    return labels[ort_outs[0].argmax()]
+    # return labels[ort_outs[0].argmax()]
+    print(ort_outs)
+    return label_dict[ort_outs[0].argmax()]
 
 
 if __name__ == "__main__":
