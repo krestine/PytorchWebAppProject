@@ -1,7 +1,7 @@
 from flask import Flask, request
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
-# import os
+import os
 import json
 # import base64
 
@@ -14,9 +14,10 @@ import numpy as np
 import onnx
 import onnxruntime
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 import requests
+import matplotlib as plt
 
 # All the 1000 imagenet classes
 class_labels = 'imagenet_classes.json'
@@ -38,7 +39,7 @@ ALLOWED_EXTENSIONS = set(['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'])
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 label_dict = {0: '사과', 1: '산', 2: '달', 3: '얼굴', 4: '문',
-              5: '봉투', 6: '물고기', 7: '기타', 8: '별', 9: '번개'}
+              5: '봉투', 6: '물고기', 7: '컵', 8: '별', 9: '번개'}
 
 @app.route("/")
 def hello():
@@ -64,11 +65,11 @@ def upload_file():
 
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            # file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
             # Send uploaded image for prediction
             # read_img = Image.open(UPLOAD_FOLDER + filename)
             read_img = Image.open(file)
+            # read_img.show()
             if filename.endswith('.png'):
                 read_img = read_img.convert('RGB')
             predicted_image_class = predict_img(read_img)
@@ -77,23 +78,45 @@ def upload_file():
     return json.dumps(predicted_image_class)
 
 
+def convert_to_np(pil_img):
+    """
+    Function to convert PIL Image to numpy array.
+    INPUT:
+        pil_img - (PIL Image) 28x28 image to be converted
+    OUTPUT:
+        img - (numpy array) converted image with shape (28, 28)
+    """
+    pil_img = pil_img.convert('RGB')
+
+    img = np.zeros((28, 28), dtype=np.float32)
+    pixels = pil_img.load()
+
+    for i in range(0, 28):
+        for j in range(0, 28):
+            img[i, j] = min((1 - pixels[j, i][0] / 255) * 4, 1.0)
+
+    return img
+
+
 def preprocess(input_data):
     # convert the input data into the float32 input
-    img_data = input_data.astype('float32')
-    norm_img_data = img_data.reshape(1, 784).astype('float32')
-    return norm_img_data
+    img_data = input_data.astype(np.float32)
+    '''# norm_img_data = img_data.reshape(1, 784).astype('float32') / 255
+    # return norm_img_data
 
     # normalize
-    ''' mean_vec = np.array([0.485, 0.456, 0.406])
+    mean_vec = np.array([0.485, 0.456, 0.406])
     stddev_vec = np.array([0.229, 0.224, 0.225])
     norm_img_data = np.zeros(img_data.shape).astype('float32')
     for i in range(img_data.shape[0]):
         norm_img_data[i, :, :] = (img_data[i, :, :] / 255 - mean_vec[i]) / stddev_vec[i]
 
     # add batch channel
-    # norm_img_data = norm_img_data.reshape(1, 1, 28, 28).astype('float32')
-    norm_img_data = norm_img_data.reshape(1, 784).astype('float32')
-    return norm_img_data'''
+    # norm_img_data = norm_img_data.reshape(1, 1, 28, 28).astype('float32')'''
+    norm_img_data = convert_to_np(input_data)
+    print(norm_img_data)
+    # print(norm_img_data)
+    return norm_img_data
 
 
 def predict_img(read_img):
@@ -131,8 +154,9 @@ def predict_img(read_img):
     ])'''
     # read_img = read_img.resize((224, 224))
     read_img = read_img.resize((28, 28))
-    read_img = read_img.convert('L')
-
+    # read_img = read_img.convert('L')
+    read_img = ImageOps.invert(read_img)
+    # read_img.show()
     # Path to uploaded image
     # path_img = img_path
 
@@ -144,12 +168,19 @@ def predict_img(read_img):
         # read_img = read_img.convert('RGB')
 
     # image_data = np.array(read_img).transpose(2, 0, 1)
-    image_data = np.array(read_img)
-    img_tensor = preprocess(image_data)
+    # image_data = np.asarray(read_img)
+    # read_img.show()
+    image_data = convert_to_np(read_img)
+    image_data = image_data.reshape(1, 784)
+    # print(image_data)
+    # print(image_data.shape)
+    # print(image_data)
+    # print(image_data.shape)
+    # img_tensor = preprocess(image_data)
     # img_tensor.unsqueeze_(0)
     # img_variable = Variable(img_tensor)
 
-    ort_inputs = {ort_session.get_inputs()[0].name: img_tensor}
+    ort_inputs = {ort_session.get_inputs()[0].name: image_data}
     ort_outs = ort_session.run(None, ort_inputs)
     img_out_y = ort_outs[0]
 

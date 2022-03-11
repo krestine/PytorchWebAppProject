@@ -1,4 +1,5 @@
 import torch.onnx
+import onnx
 from torch import nn
 from torch import optim
 import torch.nn.functional as F
@@ -50,7 +51,7 @@ x = torch.randn(batch_size, 784, requires_grad=True).to(device)
 output = model(x)
 
 # convert
-torch.onnx.export(model, x, "./test_onnx.onnx", export_params=True, opset_version=10, do_constant_folding=True
+torch.onnx.export(model, x, "./test_onnx.onnx", export_params=True, opset_version=11, do_constant_folding=True
                   , input_names = ['input'], output_names=['output']
                   # , dynamic_axes={'input' : {0 : 'batch_size'}, 'output' : {0 : 'batch_size'}}
                   )
