@@ -76,8 +76,8 @@ class App extends Component {
 
     
     var t0 = performance.now();
-	//axios.post('https://krestine.pythonanywhere.com/upload', formData)
-    axios.post('http://127.0.0.1:5000/upload', formData)
+	axios.post('https://krestine.pythonanywhere.com/upload', formData)
+    //axios.post('http://127.0.0.1:5000/upload', formData)
     .then(function(response, data) {
             data = response.data;
             self.setState({imagePrediction:data})
